@@ -45,6 +45,12 @@ jobs:
         run: |
           notation plugin install --checksum 864fa414b2b5df4709bdcd95d10ff65d98445d4418e8783a313b4a318d454498 https://github.com/shizhMSFT/notation-local-signer/releases/download/v0.1.0/notation-local-signer_0.1.0_linux_amd64.tar.gz
           notation plugin ls
+      - name: sign released image
+        env:
+          OBOM_SIGNING_KEY: ${{ secrets.OBOM_SIGNING_KEY }}
+        run: |
+          notation key add --plugin local-signer --id `pwd`/obom.crt --plugin-config env=OBOM_SIGNING_KEY --default obom
+          notation sign ${{ steps.prepare.outputs.ref }}
       - name: clear
         if: always()
         run: |
