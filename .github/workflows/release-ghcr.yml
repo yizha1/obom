@@ -1,0 +1,51 @@
+name: release-ghcr
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: prepare
+        id: prepare
+        run: |
+          VERSION=${GITHUB_REF#refs/*/}
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          if [[ "${VERSION}" == "${BRANCH_NAME}" ]]; then
+            VERSION=$(git rev-parse --short HEAD)
+          fi
+          echo ::set-output name=version::${VERSION}
+          echo ::set-output name=ref::ghcr.io/${{ github.repository }}:${VERSION}
+      - name: docker login
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: docker build
+        run: |          
+          docker buildx create --use
+          docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t ${{ steps.prepare.outputs.ref }} --push .
+      - name: setup notation
+        uses: shizhMSFT/setup-notation@main
+        with:
+          version: v1.0.0
+          # Override the download url
+          # TODO: add checksum
+          url: https://github.com/notation-playground/notation/releases/download/v1.0.0-playground.2/notation_1.0.0-playground.2_linux_amd64.tar.gz
+      - name: install notation plugin
+        run: |
+          notation plugin install --checksum 864fa414b2b5df4709bdcd95d10ff65d98445d4418e8783a313b4a318d454498 https://github.com/shizhMSFT/notation-local-signer/releases/download/v0.1.0/notation-local-signer_0.1.0_linux_amd64.tar.gz
+          notation plugin ls
+      - name: clear
+        if: always()
+        run: |
+          rm -f ${HOME}/.docker/config.json
